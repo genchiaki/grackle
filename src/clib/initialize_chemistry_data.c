@@ -65,7 +65,11 @@ extern void FORTRAN_NAME(calc_rates_g)(
      double *k50, double *k51, double *k52, double *k53, double *k54, double *k55,
      double *k56, double *k57, double *k58, int *ndratec, double *dtemstart, 
      double *dtemend, double *h2dusta, double *ncrca, double *ncrd1a, double *ncrd2a, 
-     int *ioutput);
+     int *ioutput
+#ifdef SMBH_RAD
+   , double *h2dust2a
+#endif
+    );
 
 int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                chemistry_data_storage *my_rates,
@@ -210,6 +214,10 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
     my_rates->k58 = malloc(my_chemistry->NumberOfTemperatureBins * sizeof(double));
     my_rates->h2dust = malloc(my_chemistry->NumberOfTemperatureBins *
                               my_chemistry->NumberOfDustTemperatureBins * sizeof(double));
+#ifdef SMBH_RAD
+    my_rates->h2dust2= malloc(my_chemistry->NumberOfTemperatureBins *
+                              my_chemistry->NumberOfDustTemperatureBins * sizeof(double));
+#endif
     my_rates->n_cr_n = malloc(my_chemistry->NumberOfTemperatureBins * sizeof(double));
     my_rates->n_cr_d1 = malloc(my_chemistry->NumberOfTemperatureBins * sizeof(double));
     my_rates->n_cr_d2 = malloc(my_chemistry->NumberOfTemperatureBins * sizeof(double));
@@ -285,7 +293,18 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
      &my_chemistry->NumberOfDustTemperatureBins, &my_chemistry->DustTemperatureStart, 
      &my_chemistry->DustTemperatureEnd, my_rates->h2dust, 
      my_rates->n_cr_n, my_rates->n_cr_d1, my_rates->n_cr_d2, 
-     &ioutput);
+     &ioutput
+#ifdef SMBH_RAD
+   , my_rates->h2dust2
+#endif
+    );
+
+#ifdef SMBH_RAD
+  if (calc_rates_dust(my_chemistry, my_rates) == FAIL) {
+    fprintf(stderr, "Error in calc_rates_md.\n");
+    return FAIL;
+  }
+#endif
 
   /* Initialize Cloudy cooling. */
   my_rates->cloudy_data_new = 1;
@@ -419,6 +438,10 @@ void show_parameters(FILE *fp, chemistry_data *my_chemistry)
           my_chemistry->photoelectric_heating_rate);
   fprintf(fp, "use_isrf_field                    = %d\n",
           my_chemistry->use_isrf_field);
+#ifdef SMBH_RAD
+  fprintf(fp, "use_bhrf_field                    = %d\n",
+          my_chemistry->use_bhrf_field);
+#endif
   fprintf(fp, "interstellar_radiation_field      = %g\n",
           my_chemistry->interstellar_radiation_field);
   fprintf(fp, "use_volumetric_heating_rate       = %d\n",
@@ -560,6 +583,9 @@ int _free_chemistry_data(chemistry_data *my_chemistry,
     GRACKLE_FREE(my_rates->k57);
     GRACKLE_FREE(my_rates->k58);
     GRACKLE_FREE(my_rates->h2dust);
+#ifdef SMBH_RAD
+    GRACKLE_FREE(my_rates->h2dust2);
+#endif
     GRACKLE_FREE(my_rates->n_cr_n);
     GRACKLE_FREE(my_rates->n_cr_d1);
     GRACKLE_FREE(my_rates->n_cr_d2);

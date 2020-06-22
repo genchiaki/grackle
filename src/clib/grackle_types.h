@@ -52,6 +52,10 @@ typedef struct
   gr_float *e_density;
   gr_float *metal_density;
   gr_float *dust_density;
+//#ifdef SMBH_RAD
+  gr_float *Silicate_density;
+  gr_float *Graphite_density;
+//#endif
 
   gr_float *internal_energy;
   gr_float *x_velocity;
@@ -70,6 +74,9 @@ typedef struct
   gr_float *H2_self_shielding_length;
 
   gr_float *isrf_habing;
+//#ifdef SMBH_RAD
+  gr_float *bhrf;
+//#endif
 
 } grackle_field_data;
 

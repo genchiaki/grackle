@@ -72,7 +72,15 @@ extern void FORTRAN_NAME(cool_multi_time_g)(
  	long long *metDataSize, double *metCooling,
         double *metHeating, int *clnew,
         int *iVheat, int *iMheat, gr_float *Vheat, gr_float *Mheat,
-        int *iisrffield, gr_float* isrf_habing);
+        int *iisrffield, gr_float* isrf_habing
+#ifdef SMBH_RAD
+      , gr_float *Silicate, gr_float *Graphite
+      , int *ibhrffield, gr_float* bhrf
+      , double *S_Silicate, double *S_Graphite
+      , int *kp_gr_Size, int*kp_gr_N, double *kp_gr_dTd, double *kp_gr_Td
+      , double *kp_Silicate, double *kp_Graphite
+#endif
+        );
 
 int local_calculate_cooling_time(chemistry_data *my_chemistry,
                                  chemistry_data_storage *my_rates,
@@ -278,7 +286,22 @@ int local_calculate_cooling_time(chemistry_data *my_chemistry,
        my_fields->volumetric_heating_rate,
        my_fields->specific_heating_rate,
        &my_chemistry->use_isrf_field,
-       my_fields->isrf_habing);
+       my_fields->isrf_habing
+#ifdef SMBH_RAD
+     , my_fields->Silicate_density
+     , my_fields->Graphite_density
+     ,&my_chemistry->use_bhrf_field
+     , my_fields->bhrf
+     ,&my_rates->S_Silicate
+     ,&my_rates->S_Graphite
+     ,&my_rates->kp_gr_Size
+     , my_rates->kp_gr_N
+     ,&my_rates->kp_gr_dTd
+     , my_rates->kp_gr_Td
+     , my_rates->kp_Silicate
+     , my_rates->kp_Graphite
+#endif
+       );
  
   return SUCCESS;
 }

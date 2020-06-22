@@ -43,7 +43,15 @@
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
      &                iisrffield, isrf_habing,
-     &                itmask)
+     &                itmask
+#ifdef SMBH_RAD
+     &              , tdust2, Silicate, Graphite
+     &              , ibhrffield, bhrf
+     &              , S_Silicate, S_Graphite
+     &              , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td
+     &              , kp_Silicate, kp_Graphite
+#endif
+     &                )
 
 !  SOLVE RADIATIVE COOLING/HEATING EQUATIONS
 !
@@ -76,6 +84,9 @@
      &        imetal, igammah, ih2optical, iciecool, clnew,
      &        iVheat, iMheat, iradtrans, iradshield,
      &        iisrffield
+#ifdef SMBH_RAD
+     &      , ibhrffield
+#endif
 
       real*8  aye, temstart, temend, z_solar, fgr,
      &        utem, uxyz, uaye, urho, utim,
@@ -89,6 +100,9 @@
      &        metal(in,jn,kn), dust(in,jn,kn),
      &        Vheat(in,jn,kn), Mheat(in,jn,kn),
      &        photogamma(in,jn,kn), isrf_habing(in,jn,kn)
+#ifdef SMBH_RAD
+     &      , bhrf(in,jn,kn), Silicate(in,jn,kn), Graphite(in,jn,kn)
+#endif
       real*8  hyd01ka(nratec), h2k01a(nratec), vibha(nratec), 
      &        rotha(nratec), rotla(nratec), gpldla(nratec),
      &        gphdla(nratec), hdltea(nratec), hdlowa(nratec),
@@ -118,7 +132,12 @@
      &     priCooling(priDataSize), priHeating(priDataSize),
      &     priMMW(priDataSize),
      &     metCooling(metDataSize), metHeating(metDataSize)
-
+#ifdef SMBH_RAD
+      real*8  S_Silicate, S_Graphite
+      integer kp_gr_Size, kp_gr_N(1)
+      real*8  kp_gr_dTd, kp_gr_Td(kp_gr_N(1))
+     &      , kp_Silicate(kp_gr_Size), kp_Graphite(kp_gr_Size)
+#endif
 !  Parameters
 
       integer ti_max
@@ -145,6 +164,9 @@
      &       tgas(in), tgasold(in), mmw(in), tdust(in), rhoH(in),
      &       mynh(in), metallicity(in), dust2gas(in), edot(in),
      &       myde(in), gammaha_eff(in)
+#ifdef SMBH_RAD
+     &     , tdust2(in)
+#endif
 
 !  Cooling/heating slice locals
 
@@ -157,6 +179,9 @@
      &       gaHI(in), gaH2(in), gaHe(in), gaHp(in), gael(in),
      &       h2lte(in), galdl(in), gasgr(in), gasgr_tdust(in),
      &       regr(in), myisrf(in)
+#ifdef SMBH_RAD
+     &     , mybhrf(in)
+#endif
 
 !  Iteration mask
 
@@ -164,6 +189,9 @@
 
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
+#ifdef SMBH_RAD
+!!    write(*,*) 'bbb', bhrf(1,1,1)
+#endif
 
 !     Set flag for dust-related options
 
@@ -718,6 +746,21 @@ c  new (correct) way: (april 4, 2007)
                endif
             enddo
          endif
+#ifdef SMBH_RAD
+         if (ibhrffield .gt. 0) then
+            do i = is+1, ie+1
+               if ( itmask(i) ) then
+                  mybhrf(i) = bhrf(i,j,k)
+               endif
+            enddo
+         else
+            do i = is+1, ie+1
+               if ( itmask(i) ) then
+                  mybhrf(i) = 0._DKIND
+               endif
+            enddo
+         endif
+#endif
       endif
 
 !     --- Gas to grain heat transfer ---
@@ -730,10 +773,64 @@ c  new (correct) way: (april 4, 2007)
             if ( itmask(i) ) then
                gasgr(i) = gasgra(indixe(i)) + tdef(i)
      &              *(gasgra(indixe(i)+1) -gasgra(indixe(i)))
+#ifdef SMBH_RAD
+               gasgr_tdust(i) = gasgr(i) * coolunit / mh
+#else
                gasgr_tdust(i) = fgr * gasgr(i) * coolunit / mh
+#endif
             endif
          enddo
 
+#ifdef SMBH_RAD
+!     Compute silicate dust temperature
+
+         call calc_tdust_1d_g(tdust, tgas, mynh, gasgr_tdust,
+     &        gamma_isrfa, myisrf, itmask, comp2, in, is, ie, j, k
+     &      , mybhrf, S_Silicate
+     &      , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_Silicate)
+!!       write(*,*) 'dd1', tdust(1)
+
+!     Calculate silicate cooling rate
+
+         do i = is+1, ie+1
+            if ( itmask(i) ) then
+               edot(i) = edot(i) - 
+     &              gasgr(i) * (tgas(i) - tdust(i)) * 
+     &              Silicate(i,j,k)*S_Silicate * rhoH(i)
+!!       write(*,*) 'dd2 Silicate'
+!!       write(*,*) gasgr(i)*coolunit,   tgas(i) , tdust(i) 
+!!       write(*,*) Silicate(i,j,k)*mh*S_Silicate*dom , rhoH(i)*dom
+!!       write(*,*) gasgr(i) * (tgas(i) - tdust(i)) * 
+!!   &              Silicate(i,j,k)*mh*S_Silicate * rhoH(i)
+!!   &             /d(i,j,k) * (xbase1/tbase1)**2/tbase1
+            endif
+         enddo
+
+!     Compute graphite dust temperature
+
+         call calc_tdust_1d_g(tdust2, tgas, mynh, gasgr_tdust,
+     &        gamma_isrfa, myisrf, itmask, comp2, in, is, ie, j, k
+     &      , mybhrf, S_Graphite
+     &      , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_Graphite)
+!!       write(*,*) 'ee1', tdust2(1)
+
+!     Calculate graphite cooling rate
+
+         do i = is+1, ie+1
+            if ( itmask(i) ) then
+               edot(i) = edot(i) - 
+     &              gasgr(i) * (tgas(i) - tdust2(i)) * 
+     &              Graphite(i,j,k)*S_Graphite * rhoH(i)
+!!       write(*,*) 'dd2 Graphite'
+!!       write(*,*) gasgr(i)*coolunit ,  tgas(i) , tdust2(i) 
+!!       write(*,*) Graphite(i,j,k)*mh*S_Graphite*dom , rhoH(i)*dom
+!!       write(*,*) gasgr(i) * (tgas(i) - tdust2(i)) * 
+!!   &              Graphite(i,j,k)*mh*S_Graphite * rhoH(i)
+!!   &             /d(i,j,k) * (xbase1/tbase1)**2/tbase1
+            endif
+         enddo
+
+#else
 !     Compute dust temperature
 
          call calc_tdust_1d_g(tdust, tgas, mynh, gasgr_tdust,
@@ -748,7 +845,7 @@ c  new (correct) way: (april 4, 2007)
      &              dust2gas(i) * rhoH(i) * rhoH(i)
             endif
          enddo
-
+#endif
       endif
 
 !     --- Compute (external) radiative heating terms ---

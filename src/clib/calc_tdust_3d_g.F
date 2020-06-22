@@ -18,7 +18,14 @@
      &     utem, uxyz, uaye,
      &     urho, utim,
      &     gas_temp, dust_temp,
-     &     iisrffield, isrf_habing)
+     &     iisrffield, isrf_habing
+#ifdef SMBH_RAD
+     &   , dust2_temp
+     &   , ibhrffield, bhrf, S_Silicate, S_Graphite
+     &   , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td
+     &   , kp_Silicate, kp_Graphite
+#endif
+     & )
 
 !  COMPUTE THE DUST TEMPERATURE
 !
@@ -45,6 +52,9 @@
 
       integer in, jn, kn, is, js, ks, ie, je, ke, nratec,
      &        iexpand, ispecies, idim, iisrffield
+#ifdef SMBH_RAD
+     &      , ibhrffield
+#endif
       real*8  aye, temstart, temend,
      &        utem, uxyz, uaye, urho, utim, fgr, isrf
       R_PREC  d(in,jn,kn),
@@ -53,6 +63,14 @@
      &     HM(in,jn,kn),  H2I(in,jn,kn), H2II(in,jn,kn),
      &     gas_temp(in,jn,kn), dust_temp(in,jn,kn),
      &     isrf_habing(in,jn,kn)
+#ifdef SMBH_RAD
+     &   , dust2_temp(in,jn,kn)
+     &   , bhrf(in,jn,kn)
+      real*8  S_Silicate, S_Graphite
+      integer kp_gr_Size, kp_gr_N(1)
+      real*8  kp_gr_dTd, kp_gr_Td(kp_gr_N(1))
+     &      , kp_Silicate(kp_gr_Size), kp_Graphite(kp_gr_Size)
+#endif
 
 !  Chemistry tables
       real*8  gasgra(nratec), gamma_isrfa
@@ -75,6 +93,10 @@
       R_PREC  t1(in), t2(in), logtem(in), tdef(in), 
      &     tgas(in), tdust(in), nh(in), gasgr(in),
      &     myisrf(in)
+#ifdef SMBH_RAD
+     &   , mybhrf(in)
+     &   , tdust2(in)
+#endif
           
 !  Iteration mask for multi_cool
 
@@ -132,6 +154,13 @@
            else
               myisrf(i) = isrf
            endif
+#ifdef SMBH_RAD
+           if (ibhrffield .gt. 0) then
+              mybhrf(i) = bhrf(i,j,k)
+           else
+              mybhrf(i) = 0._DKIND
+           endif
+#endif
 
 !     Compute hydrogen number density
 
@@ -164,20 +193,46 @@
 
            gasgr(i) = gasgra(indixe(i)) + tdef(i)
      &          *(gasgra(indixe(i)+1) -gasgra(indixe(i)))
+#ifdef SMBH_RAD
+           gasgr(i) = gasgr(i) * coolunit / mh
+#else
            gasgr(i) = gasgr(i) * fgr * coolunit / mh
+#endif
 
         enddo
 
+#ifdef SMBH_RAD
+!     --- Compute silicate temperature in a slice ---
+
+        call calc_tdust_1d_g(tdust, tgas, nh, gasgr,
+     &       gamma_isrfa, myisrf,
+     &       itmask, trad, in, is, ie, j, k
+     &     , mybhrf, S_Silicate
+     &     , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_Silicate)
+
+!     --- Compute graphite temperature in a slice ---
+
+        call calc_tdust_1d_g(tdust2, tgas, nh, gasgr,
+     &       gamma_isrfa, myisrf,
+     &       itmask, trad, in, is, ie, j, k
+     &     , mybhrf, S_Graphite
+     &     , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_Graphite)
+#else
 !     --- Compute dust temperature in a slice ---
 
         call calc_tdust_1d_g(tdust, tgas, nh, gasgr,
      &       gamma_isrfa, myisrf,
      &       itmask, trad, in, is, ie, j, k)
+#endif
 
 !     Copy slice values back to grid
 
         do i = is+1, ie+1
            dust_temp(i,j,k) = tdust(i)
+#ifdef SMBH_RAD
+           dust2_temp(i,j,k) = tdust2(i)
+!!         write(*,*) 'hhh', tdust(i), tdust2(i)
+#endif
         enddo
 
       enddo

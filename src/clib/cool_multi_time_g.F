@@ -32,7 +32,15 @@
      &                metPar1, metPar2, metPar3, metPar4, metPar5,
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
-     &                iisrffield, isrf_habing)
+     &                iisrffield, isrf_habing
+#ifdef SMBH_RAD
+     &              , Silicate, Graphite
+     &              , ibhrffield, bhrf
+     &              , S_Silicate, S_Graphite
+     &              , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td
+     &              , kp_Silicate, kp_Graphite
+#endif
+     &              )
 
 !  SOLVE RADIATIVE COOLING/HEATING EQUATIONS
 !
@@ -66,6 +74,9 @@
      &        idustfield, igammah, ih2optical, iciecool,
      &        clnew, iVheat, iMheat, iradtrans, iradshield,
      &        iisrffield
+#ifdef SMBH_RAD
+     &      , ibhrffield
+#endif
 
       real*8  aye, temstart, temend,
      &        utem, uxyz, uaye, urho, utim,
@@ -80,6 +91,9 @@
      &        Vheat(in,jn,kn), Mheat(in,jn,kn),
      &        isrf_habing(in,jn,kn),
      &        cooltime(in,jn,kn)
+#ifdef SMBH_RAD
+     &      , bhrf(in,jn,kn), Silicate(in,jn,kn), Graphite(in,jn,kn)
+#endif
       real*8  photogamma(in,jn,kn)
       real*8  hyd01ka(nratec), h2k01a(nratec), vibha(nratec), 
      &        rotha(nratec), rotla(nratec), gpldla(nratec),
@@ -110,7 +124,12 @@
      &     priCooling(priDataSize), priHeating(priDataSize),
      &     priMMW(priDataSize),
      &     metCooling(metDataSize), metHeating(metDataSize)
-
+#ifdef SMBH_RAD
+      real*8  S_Silicate, S_Graphite
+      integer kp_gr_Size, kp_gr_N(1)
+      real*8  kp_gr_dTd, kp_gr_Td(kp_gr_N(1))
+     &      , kp_Silicate(kp_gr_Size), kp_Graphite(kp_gr_Size)
+#endif
 !  Parameters
 
 !  Locals
@@ -127,6 +146,9 @@
      &       tdust(in), metallicity(in), dust2gas(in), rhoH(in),
      &       mynh(in), myde(in), gammaha_eff(in),
      &       gasgr_tdust(in), regr(in)
+#ifdef SMBH_RAD
+     &     , tdust2(in)
+#endif
       real*8 edot(in)
 
 !  Cooling/heating slice locals
@@ -287,7 +309,15 @@
      &                metPar1, metPar2, metPar3, metPar4, metPar5,
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
-     &                iisrffield, isrf_habing, itmask)
+     &                iisrffield, isrf_habing, itmask
+#ifdef SMBH_RAD
+     &              , tdust2, Silicate, Graphite
+     &              , ibhrffield, bhrf
+     &              , S_Silicate, S_Graphite
+     &              , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td
+     &              , kp_Silicate, kp_Graphite
+#endif
+     &                )
 
 !        Compute the cooling time on the slice
 !          (the gamma used here is the same as used to calculate the pressure

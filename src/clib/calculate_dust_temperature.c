@@ -48,13 +48,24 @@ extern void FORTRAN_NAME(calc_tdust_3d_g)(
 	double *utem, double *uxyz, double *uaye,
 	double *urho, double *utim,
 	gr_float *gas_temp, gr_float *dust_temp,
-        int *iisrffield, gr_float* isrf_habing);
+        int *iisrffield, gr_float* isrf_habing
+#ifdef SMBH_RAD
+      , gr_float *dust2_temp
+      , int *ibhrffield, gr_float* bhrf, double *S_Silicate, double *S_Graphite
+      , int *kp_gr_Size, int*kp_gr_N, double *kp_gr_dTd, double *kp_gr_Td
+      , double *kp_Silicate, double *kp_Graphite
+#endif
+        );
 
 int local_calculate_dust_temperature(chemistry_data *my_chemistry,
                                      chemistry_data_storage *my_rates,
                                      code_units *my_units,
                                      grackle_field_data *my_fields,
-                                     gr_float *dust_temperature)
+                                     gr_float *dust_temperature
+#ifdef SMBH_RAD
+                                   , gr_float *dust2_temperature
+#endif
+                                     )
 {
 
   if (!my_chemistry->use_grackle)
@@ -131,7 +142,21 @@ int local_calculate_dust_temperature(chemistry_data *my_chemistry,
        temperature,
        dust_temperature,
        &my_chemistry->use_isrf_field,
-       my_fields->isrf_habing);
+       my_fields->isrf_habing
+#ifdef SMBH_RAD
+     , dust2_temperature
+     , &my_chemistry->use_bhrf_field
+     , my_fields->bhrf
+     ,&my_rates->S_Silicate
+     ,&my_rates->S_Graphite
+     ,&my_rates->kp_gr_Size
+     , my_rates->kp_gr_N
+     ,&my_rates->kp_gr_dTd
+     , my_rates->kp_gr_Td
+     , my_rates->kp_Silicate
+     , my_rates->kp_Graphite
+#endif
+       );
 
   free(temperature);
 
@@ -140,11 +165,19 @@ int local_calculate_dust_temperature(chemistry_data *my_chemistry,
 
 int calculate_dust_temperature(code_units *my_units,
                                grackle_field_data *my_fields,
-                               gr_float *dust_temperature)
+                               gr_float *dust_temperature
+#ifdef SMBH_RAD
+                             , gr_float *dust2_temperature
+#endif
+                               )
 {
   if (local_calculate_dust_temperature(
           grackle_data, &grackle_rates, my_units,
-          my_fields, dust_temperature) == FAIL) {
+          my_fields, dust_temperature
+#ifdef SMBH_RAD
+        , dust2_temperature
+#endif
+          ) == FAIL) {
     fprintf(stderr, "Error in local_calculate_dust_temperature.\n");
     return FAIL;
   }

@@ -23,6 +23,7 @@ OBJS_CONFIG_LIB = \
         calc_temp1d_cloudy_g.lo \
         calc_temp_cloudy_g.lo \
         calc_rates_g.lo \
+        calc_rates_dust.lo \
         calc_tdust_1d_g.lo \
         calc_tdust_3d_g.lo \
         cie_thin_cooling_rate_g.lo \

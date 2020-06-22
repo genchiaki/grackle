@@ -86,13 +86,21 @@ int _calculate_cooling_time(chemistry_data *my_chemistry,
 
 int calculate_dust_temperature(code_units *my_units,
                                grackle_field_data *my_fields,
-                               gr_float *dust_temperature);
+                               gr_float *dust_temperature
+//#ifdef SMBH_RAD
+                             , gr_float *dust2_temperature
+//#endif
+                              );
 
 int local_calculate_dust_temperature(chemistry_data *my_chemistry,
                                      chemistry_data_storage *my_rates,
                                      code_units *my_units,
                                      grackle_field_data *my_fields,
-                                     gr_float *dust_temperature);
+                                     gr_float *dust_temperature
+//#ifdef SMBH_RAD
+                                   , gr_float *dust2_temperature
+//#endif
+                                    );
 
 int calculate_gamma(code_units *my_units,
                     grackle_field_data *my_fields,

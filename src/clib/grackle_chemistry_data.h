@@ -76,6 +76,9 @@ typedef struct
 
   /* Flag to supply a field for the interstellar radiation field */
   int use_isrf_field;
+#ifdef SMBH_RAD
+  int use_bhrf_field;
+#endif
 
   // local FUV interstellar radiation field in Habing units
   double interstellar_radiation_field;
@@ -272,6 +275,9 @@ typedef struct
 
   /* H2 formation on dust grains */
   double *h2dust;
+//#ifdef SMBH_RAD
+  double *h2dust2;
+//#endif
 
   /* Chemical heating from H2 formation. */
   /* numerator and denominator of Eq 23 of Omukai ea. 2000. */
@@ -366,6 +372,17 @@ typedef struct
 
   /* New/old cloudy data flag */
   int cloudy_data_new;
+
+//#ifdef SMBH_RAD
+  double  S_Silicate;
+  double  S_Graphite;
+  int     kp_gr_Size;
+  int    *kp_gr_N;
+  double  kp_gr_dTd;
+  double *kp_gr_Td;
+  double *kp_Silicate;
+  double *kp_Graphite;
+//#endif
 
 } chemistry_data_storage;
 

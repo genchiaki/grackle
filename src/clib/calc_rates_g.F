@@ -21,6 +21,9 @@ c
      &             k57a, k58a, 
      &             ndratec, dtemstart, dtemend, h2dusta, 
      &             ncrna, ncrd1a, ncrd2a, ioutput
+#ifdef SMBH_RAD
+     &           , h2dust2a
+#endif
      &                     )
 c
 c  COMPUTE MULTISPECIES RATE LOOKUP TABLE
@@ -158,6 +161,9 @@ c
      &        k57a(nratec), k58a(nratec),
      &        k13dda(nratec, 14),
      &        h2dusta(nratec, ndratec),
+#ifdef SMBH_RAD
+     &        h2dust2a(nratec, ndratec),
+#endif
      &        ncrna(nratec), ncrd1a(nratec), ncrd2a(nratec)
       integer ioutput
 c
@@ -172,6 +178,15 @@ c
      &           tevk = 1.1605d+4, mh = mass_h, 
      &           pi=pi_val, tiny_cgs = 1.0d-37, 
      &           dhuge = 1.0d+30, kb = kboltz)
+#ifdef SMBH_RAD
+      real*8 vH_avr, S_H, bHP_aPC, epsilon_H2
+      real*8 E_HC_Silicate, E_HP_Silicate, E_S_Silicate
+     &     , E_HC_Graphite, E_HP_Graphite, E_S_Graphite
+      parameter (E_HC_Silicate = 200.d0, E_HP_Silicate = 650.d0
+     &         , E_S_Silicate = 3.d4
+     &         , E_HC_Graphite = 250.d0, E_HP_Graphite = 800.d0
+     &         , E_S_Graphite = 3.d4) ! Kelvin
+#endif
 
 c
 c         Set various cutoff values in eV.
@@ -329,6 +344,9 @@ c
 c
         do j = 1, ndratec
            h2dusta(i,j) = tiny
+#ifdef SMBH_RAD
+           h2dust2a(i,j) = tiny
+#endif
         enddo
 c
         ncrna(i)  = tiny
@@ -554,6 +572,29 @@ c
            d_logttt = log(dtemstart) + real(j-1, 8)*d_dlogtem
            d_ttt = exp(d_logttt)
            d_ttt2 = d_ttt / 1.0d2
+#ifdef SMBH_RAD
+c     Cazaux & Tielens (2002)
+           vH_avr = sqrt( 8.d0/pi * kb*ttt / mh )
+           S_H = ( 1.d0 + 0.4d0*( (ttt + d_ttt)/100.d0 )**0.5d0
+     &                  + 0.2d0*(ttt/100.d0)
+     &                  + 0.08d0*(ttt/100.d0)**2.d0 )**(-1.d0)
+
+           bHP_aPC = 1.d0/4.d0
+     &      * ( 1.d0 + sqrt( (E_HC_Silicate - E_S_Silicate)
+     &                     / (E_HP_Silicate - E_S_Silicate) ) )**2.d0
+     &      * exp(-E_S_Silicate / d_ttt)
+           epsilon_H2 = (1.d0 + bHP_aPC)**(-1.d0)
+           h2dusta(i,j) = 0.5d0 * vH_avr * S_H * epsilon_H2
+     &                  / kunit * mh
+
+           bHP_aPC = 1.d0/4.d0
+     &      * ( 1.d0 + sqrt( (E_HC_Graphite - E_S_Graphite)
+     &                     / (E_HP_Graphite - E_S_Graphite) ) )**2.d0
+     &      * exp(-E_S_Graphite / d_ttt)
+           epsilon_H2 = (1.d0 + bHP_aPC)**(-1.d0)
+           h2dust2a(i,j) = 0.5d0 * vH_avr * S_H * epsilon_H2
+     &                  / kunit * mh
+#else
 #define USE_OMUKAI_2000
 #ifdef  USE_OMUKAI_2000
 c
@@ -575,6 +616,7 @@ c
      &          (0.2d0 * ttt2) +
      &          (8.0d-2 * ttt2**2.0d0)) / kunit
 #endif /* USE_OMUKAI_2000 */
+#endif /* SMBH_RAD */
         enddo
 c
 c       H2 formation heating terms from Equation 23 of Omukai (2000).
@@ -955,11 +997,19 @@ c
             logttt = log(temstart) + real(i-1, 8)*dlogtem
             ttt = exp(logttt)
 c
+#ifdef SMBH_RAD
+c     Energy transfer rate from gas to dust grains per unit cross-section
+c     of grains, following equation 5 of Chiaki et al. (2015)
+            gasgra(i) = (0.5d0 / sqrt(2.d0) + 0.0833333 / sqrt(4.d0))
+     &                * sqrt(8.0 * kb * ttt / pi / mh)
+     &                * 2.d0 * kb / coolunit * mh
+#else
 c     Energy transfer from gas to dust grains, following
 c     equation 2.15 of Hollenbach & McKee (1989)
 c
             gasgra(i) = grain_coef * (ttt**0.5d0) *
      &           (1.0d0 - (0.8d0 * exp(-75.0d0 / ttt))) / coolunit
+#endif
 c
 c     Electron recombination onto dust grains
 c     Eqn. 9 from Wolfire et al. (1995)

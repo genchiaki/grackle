@@ -5,7 +5,12 @@
 
       subroutine calc_tdust_1d_g(
      &     tdust, tgas, nh, gasgr, gamma_isrfa, isrf, itmask,
-     &     trad, in, is, ie, j, k)
+     &     trad, in, is, ie, j, k
+#ifdef SMBH_RAD
+     &   , bhrf, S_gr
+     &   , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_gr
+#endif
+     & )
 
 !  CALCULATE EQUILIBRIUM DUST TEMPERATURE
 !
@@ -46,8 +51,15 @@
       integer in, is, ie, j, k
 
       real*8 tdust(in), tgas(in), nh(in), gasgr(in), isrf(in)
+#ifdef SMBH_RAD
+     &     , bhrf(in)
+#endif
       real*8 gamma_isrfa, trad
-
+#ifdef SMBH_RAD
+      real*8  S_gr, k2Q_gr
+      integer kp_gr_Size, kp_gr_N(1)
+      real*8  kp_gr_dTd, kp_gr_Td(kp_gr_N(1)), kp_gr(kp_gr_Size)
+#endif
 !  Iteration mask
 
       logical itmask(in)
@@ -82,6 +94,16 @@
 
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
+#ifdef SMBH_RAD
+!!    write(*,*) 'ccc', bhrf(1)
+!!    write(*,*) S_gr
+!!    write(*,*) kp_gr_Size
+!!    write(*,*) kp_gr_N
+!!    write(*,  '(F9.2)') kp_gr_dTd
+!!    write(*,'(70F9.2)') kp_gr_Td
+!!    write(*,'(70F9.2)') kp_gr
+!!    write(*,*) ' '
+#endif
 
       pert_i = 1.e-3_DKIND
 
@@ -118,8 +140,13 @@
                nm_itmask(i) = .false.
                nm_done = nm_done + 1
             else
+#ifdef SMBH_RAD
+               tdustnow(i) = max(trad,
+     &              ((gamma_isrf(i)+bhrf(i)) / radf / kgr1)**0.17_DKIND)
+#else
                tdustnow(i) = max(trad,
      &              (gamma_isrf(i) / radf / kgr1)**0.17_DKIND)
+#endif
                pert(i) = pert_i
             endif
 
@@ -128,6 +155,11 @@
             nm_done = nm_done + 1
          endif
       enddo
+
+#ifdef SMBH_RAD
+!     Conversion factor from kappa to Q
+      k2Q_gr = 1.d0/S_gr
+#endif
 
 !     Iterate to convergence with Newton's method
 
@@ -147,18 +179,34 @@
 !     Calculate grain opacities
 
          call calc_kappa_gr_g(tdustnow, kgr, nm_itmask,
-     &        in, is, ie, t_subl)
+     &        in, is, ie, t_subl
+#ifdef SMBH_RAD
+     &      , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_gr
+#endif
+     &    )
 
          call calc_kappa_gr_g(tdplus, kgrplus, nm_itmask,
-     &        in, is, ie, t_subl)
+     &        in, is, ie, t_subl
+#ifdef SMBH_RAD
+     &      , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_gr
+#endif
+     &    )
 
 !     Calculate heating/cooling balance
 
          call calc_gr_balance_g(tdustnow, tgas, kgr, trad4, gasgr,
-     &        gamma_isrf, nh, nm_itmask, sol, in, is, ie)
+     &        gamma_isrf, nh, nm_itmask, sol, in, is, ie
+#ifdef SMBH_RAD
+     &      , bhrf, k2Q_gr
+#endif
+     &       )
 
          call calc_gr_balance_g(tdplus, tgas, kgrplus, trad4, gasgr,
-     &        gamma_isrf, nh, nm_itmask, solplus, in, is, ie)
+     &        gamma_isrf, nh, nm_itmask, solplus, in, is, ie
+#ifdef SMBH_RAD
+     &      , bhrf, k2Q_gr
+#endif
+     &       )
 
          do i = is+1, ie+1
             if ( nm_itmask(i) ) then
@@ -228,10 +276,18 @@
             enddo
 
             call calc_kappa_gr_g(bi_t_mid, kgr, bi_itmask,
-     &           in, is, ie, t_subl)
+     &           in, is, ie, t_subl
+#ifdef SMBH_RAD
+     &         , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_gr
+#endif     
+     &       )
 
             call calc_gr_balance_g(bi_t_mid, tgas, kgr, trad4, gasgr,
-     &           gamma_isrf, nh, bi_itmask, sol, in, is, ie)
+     &           gamma_isrf, nh, bi_itmask, sol, in, is, ie
+#ifdef SMBH_RAD
+     &         , bhrf, k2Q_gr
+#endif
+     &          )
 
             do i = is+1, ie+1
                if ( bi_itmask(i) ) then
@@ -302,6 +358,13 @@ c               ERROR_MESSAGE
          endif
       enddo
 
+#ifdef SMBH_RAD
+!!    write(*,*) 'cc5'
+!!    do i = is+1, ie+1
+!!      write(*,*) tdust(i)
+!!    enddo
+#endif
+
       return
       end
 
@@ -309,7 +372,11 @@ c               ERROR_MESSAGE
 !////////////////////  SUBROUTINE CALC_KAPPA_GR_G  \\\\\\\\\\\\\\\\\\\\\
 
       subroutine calc_kappa_gr_g(
-     &     tdust, kgr, itmask, in, is, ie, t_subl)
+     &     tdust, kgr, itmask, in, is, ie, t_subl
+#ifdef SMBH_RAD
+     &   , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_gr
+#endif
+     & )
 
 !  CALCULATE GRAIN PLANK MEAN OPACITY
 !
@@ -347,14 +414,24 @@ c               ERROR_MESSAGE
       real*8 t_subl
       real*8 tdust(in)
 
+#ifdef SMBH_RAD
+!  Table
+      integer kp_gr_Size, kp_gr_N(1)
+      real*8  kp_gr_dTd, kp_gr_Td(kp_gr_N(1)), kp_gr(kp_gr_Size)
+#endif
+
 !  Iteration mask
 
       logical itmask(in)
 
 !  Parameters
 
+#ifdef SMBH_RAD
+      real*8 logkgr
+#else
       real*8 kgr1, kgr200
       parameter(kgr1 = 4.0e-4_DKIND, kgr200 = 16.0_DKIND)
+#endif
 
 !  Locals
 
@@ -370,6 +447,20 @@ c               ERROR_MESSAGE
       do i = is+1, ie+1
          if ( itmask(i) ) then
 
+#ifdef SMBH_RAD
+            if (tdust(i) .lt. t_subl) then
+               call interpolate_1D_g(
+     &              log10(tdust(i)), kp_gr_N, kp_gr_Td, kp_gr_dTd, 
+     &              kp_gr_Size, kp_gr, logkgr)
+               kgr(i) = 10._DKIND**logkgr
+            else
+               call interpolate_1D_g(
+     &              log10(t_subl)  , kp_gr_N, kp_gr_Td, kp_gr_dTd, 
+     &              kp_gr_Size, kp_gr, logkgr)
+               kgr(i) = max(tiny,
+     &                 (10._DKIND**logkgr / t_subl)**(-12))
+            endif
+#else
 !     Temperature dependence from Dopcke et al. (2011).
 !     Normalized to Omukai (2000).
 
@@ -381,6 +472,7 @@ c               ERROR_MESSAGE
                kgr(i) = max(tiny, 
      &              (kgr200 * (tdust(i) / 1.5e3_DKIND)**(-12)))
             endif
+#endif
 
          endif
       enddo
@@ -393,7 +485,11 @@ c               ERROR_MESSAGE
 
       subroutine calc_gr_balance_g(
      &     tdust, tgas, kgr, trad4, gasgr, gamma_isrf, nh,
-     &     itmask, sol, in, is, ie)
+     &     itmask, sol, in, is, ie
+#ifdef SMBH_RAD
+     &   , bhrf, k2Qgr
+#endif
+     &    )
 
 !  CALCULATE GRAIN HEAT BALANCE
 !
@@ -435,6 +531,10 @@ c               ERROR_MESSAGE
       integer in, is, ie
       real*8 tdust(in), tgas(in), kgr(in), gasgr(in), nh(in), trad4,
      &     gamma_isrf(in)
+#ifdef SMBH_RAD
+     &   , bhrf(in)
+      real*8 k2Qgr
+#endif
 
 !  Iteration mask
 
@@ -448,6 +548,9 @@ c               ERROR_MESSAGE
 !  Locals
 
       integer i
+#ifdef SMBH_RAD
+      real*8 Qgr
+#endif
 
 !  Slice Locals
 
@@ -455,14 +558,31 @@ c               ERROR_MESSAGE
 
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
+#ifdef SMBH_RAD
+!!    write(*,*) 'ddd', bhrf
+#endif
 
       do i = is+1, ie+1
          if ( itmask(i) ) then
 
+#ifdef SMBH_RAD
+            Qgr = k2Qgr * kgr(i)
+            sol(i) = gamma_isrf(i) + bhrf(i) + radf * Qgr *
+     &           (trad4 - tdust(i)**4) +
+     &           (gasgr(i) * nh(i) *
+     &           (tgas(i) - tdust(i)))
+!!          write(*,*) 'cc4', k2Qgr, kgr(i)
+!!          write(*,*) gamma_isrf(i), bhrf(i), radf, Qgr
+!!          write(*,*) trad4, tdust(i)
+!!          write(*,*) gasgr(i), nh(i), tgas(i)
+!!          write(*,*) sol(i)
+!!          write(*,*) ' '
+#else
             sol(i) = gamma_isrf(i) + radf * kgr(i) *
      &           (trad4 - tdust(i)**4) +
      &           (gasgr(i) * nh(i) *
      &           (tgas(i) - tdust(i)))
+#endif
 
          endif
       enddo

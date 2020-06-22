@@ -1,4 +1,6 @@
 #include "phys_const.def"
+#define CORRECTED_BY_CHIAKI2020FEB
+#define CORRECTED_BY_CHIAKI2020MAY
 
 !=======================================================================
 !///////////////////  SUBROUTINE SOLVE_RATE_COOL_G  \\\\\\\\\\\\\\\\\\\\\
@@ -44,7 +46,16 @@
      &                metPar1, metPar2, metPar3, metPar4, metPar5,
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
-     &                iisrffield, isrf_habing)
+     &                iisrffield, isrf_habing
+#ifdef SMBH_RAD
+     &              , Silicate, Graphite
+     &              , ibhrffield, bhrf
+     &              , S_Silicate, S_Graphite
+     &              , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td
+     &              , kp_Silicate, kp_Graphite
+     &              , h2dust2a
+#endif
+     &                )
 
 !
 !  SOLVE MULTI-SPECIES RATE EQUATIONS AND RADIATIVE COOLING
@@ -163,6 +174,9 @@
      &        ndratec, clnew, iVheat, iMheat, iH2shield, iradshield,
      &        iradtrans, iradcoupled, iradstep, irt_honly,
      &        iisrffield
+#ifdef SMBH_RAD
+     &      , ibhrffield
+#endif
 
       real*8  dx, dt, aye, temstart, temend, gamma,
      &        utim, uxyz, uaye, urho, utem, fh, dtoh, z_solar, 
@@ -191,6 +205,9 @@
 !  Interstellar radiation field for dust heating
 
       R_PREC  isrf_habing(in,jn,kn)
+#ifdef SMBH_RAD
+     &      , bhrf(in,jn,kn), Silicate(in,jn,kn), Graphite(in,jn,kn)
+#endif
 
 !  Cooling tables (coolings rates as a function of temperature)
 
@@ -220,6 +237,9 @@
      &       k54a(nratec), k55a(nratec), k56a(nratec),
      &       k57a(nratec), k58a(nratec),
      &       k13dda(nratec, 14), h2dusta(nratec, ndratec),
+#ifdef SMBH_RAD
+     &       h2dust2a(nratec, ndratec),
+#endif
      &       ncrna(nratec), ncrd1a(nratec), ncrd2a(nratec),
      &       k24, k25, k26, k27, k28, k29, k30, k31
 
@@ -238,7 +258,12 @@
      &     priCooling(priDataSize), priHeating(priDataSize),
      &     priMMW(priDataSize),
      &     metCooling(metDataSize), metHeating(metDataSize)
-
+#ifdef SMBH_RAD
+      real*8  S_Silicate, S_Graphite
+      integer kp_gr_Size, kp_gr_N(1)
+      real*8  kp_gr_dTd, kp_gr_Td(kp_gr_N(1))
+     &      , kp_Silicate(kp_gr_Size), kp_Graphite(kp_gr_Size)
+#endif
 !  Parameters
 
       integer itmax
@@ -275,6 +300,9 @@
      &       tdust(in), metallicity(in), dust2gas(in),
      &       rhoH(in), mmw(in), mynh(in), myde(in), gammaha_eff(in),
      &       gasgr_tdust(in), regr(in), olddtit
+#ifdef SMBH_RAD
+     &     , tdust2(in)
+#endif
 
 !  Rate equation row temporaries
 
@@ -292,6 +320,9 @@
      &       k50(in), k51(in), k52(in), k53(in), k54(in),
      &       k55(in), k56(in), k57(in), k58(in),
      &       k13dd(in, 14), h2dust(in),
+#ifdef SMBH_RAD
+     &       h2dust2(in),
+#endif
      &       ncrn(in), ncrd1(in), ncrd2(in)
 
 !  Cooling/heating row locals
@@ -309,6 +340,9 @@
 !
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
+#ifdef SMBH_RAD
+!!    write(*,*) 'aaa', bhrf(1,1,1)
+#endif
 
 !     Set error indicator
 
@@ -326,14 +360,35 @@
       dbase1   = urho*(aye*uaye)**3 ! urho is [dens]/a^3 = [dens]/([a]*a')^3 '
       coolunit = (uaye**5 * xbase1**2 * mh**2) / (tbase1**3 * dbase1)
       uvel     = uxyz / utim
-c      chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 formed
+#ifdef CORRECTED_BY_CHIAKI2020MAY
+      chunit = (1.60218e-12_DKIND)/((xbase1/tbase1)**2*mh)   ! 1 eV per REACTION
+#else
+c     chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 formed
       chunit = (1.60218e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 1 eV per H2 formed
+#endif
 
       dx_cgs = dx * xbase1
       c_ljeans = sqrt((gamma * pi * kboltz) /
      &     (GravConst * mh * dbase1))
 
       dlogtem = (log(temend) - log(temstart))/real(nratec-1, DKIND)
+
+#ifdef CORRECTED_BY_CHIAKI2020FEB
+      if (ispecies .gt. 0) then
+
+!     Correct the species to ensure consistency (i.e. type conservation)
+
+#define ABUNDANCE_CORRECTION
+#ifdef ABUNDANCE_CORRECTION
+      call make_consistent_g(de, HI, HII, HeI, HeII, HeIII,
+     &                     HM, H2I, H2II, DI, DII, HDI, metal, 
+     &                     d, is, ie, js, je, ks, ke,
+     &                     in, jn, kn, ispecies, imetal, fh, dtoh
+     &                      )
+#endif
+
+      endif
+#endif
 
 !  Convert densities from comoving to proper
 
@@ -490,7 +545,16 @@ c      chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 fo
      &                metPar1, metPar2, metPar3, metPar4, metPar5,
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
-     &                iisrffield, isrf_habing, itmask)
+     &                iisrffield, isrf_habing, itmask
+#ifdef SMBH_RAD
+     &              , tdust2, Silicate, Graphite
+     &              , ibhrffield, bhrf
+     &              , S_Silicate, S_Graphite
+     &              , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td
+     &              , kp_Silicate, kp_Graphite
+#endif
+     &                )
+!!        write(*,*) 'fff', tdust(1), tdust2(1)
 
             if (ispecies .gt. 0) then
 
@@ -520,7 +584,12 @@ c      chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 fo
      &               k31shield, h2dust, ncrn, ncrd1, ncrd2, 
      &               t1, t2, tdef, logtem, indixe, 
      &               dom, coolunit, tbase1, xbase1, dx_cgs, c_ljeans,
-     &               iradtrans, kdissH2I, xH2shield, itmask)
+     &               iradtrans, kdissH2I, xH2shield, itmask
+#ifdef SMBH_RAD
+     &             , tdust2, h2dust2a, S_Silicate, S_Graphite
+     &             , h2dust2
+#endif
+     &           )
 
 !           Compute dedot and HIdot, the rates of change of de and HI
 !             (should add itmask to this call)
@@ -539,7 +608,11 @@ c      chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 fo
      &                     k28shield, k29shield, k30shield, k31shield,
      &                     iradtrans, irt_honly, 
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask, edot, chunit, dom)
+     &                     itmask, edot, chunit, dom
+#ifdef SMBH_RAD
+     &                   , Silicate, Graphite, h2dust2
+#endif
+     &            )
 
 !           Find timestep that keeps relative chemical changes below 10%
 
@@ -784,7 +857,11 @@ c      chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 fo
      &                     dedot_prev, HIdot_prev,
      &                     iradtrans, irt_honly, 
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask)
+     &                     itmask
+#ifdef SMBH_RAD
+     &                   , Silicate, Graphite, h2dust2
+#endif
+     &            )
 
             endif
 
@@ -1074,7 +1151,12 @@ c -------------------------------------------------------------------
      &                h2dust, ncrn, ncrd1, ncrd2,
      &                t1, t2, tdef, logtem, indixe, 
      &                dom, coolunit, tbase1, xbase1, dx_cgs, c_ljeans,
-     &                iradtrans, kdissH2I, xH2shield, itmask)
+     &                iradtrans, kdissH2I, xH2shield, itmask
+#ifdef SMBH_RAD
+     &              , tdust2, h2dust2a, S_Silicate, S_Graphite
+     &              , h2dust2
+#endif
+     &            )
 ! -------------------------------------------------------------------
 
       implicit NONE
@@ -1100,6 +1182,10 @@ c -------------------------------------------------------------------
      &       k50a(nratec), k51a(nratec), k52a(nratec), k53a(nratec),
      &       k54a(nratec), k55a(nratec), k56a(nratec), k57a(nratec),
      &       k58a(nratec), k13dda(nratec, 14), h2dusta(nratec, ndratec),
+#ifdef SMBH_RAD
+     &       h2dust2a(nratec, ndratec),
+     &       S_Silicate, S_Graphite,
+#endif
      &       ncrna(nratec), ncrd1a(nratec), ncrd2a(nratec),
      &       k24, k25, k26, k28, k29, k30, k31,
      &       piHI, piHeI,
@@ -1129,6 +1215,9 @@ c -------------------------------------------------------------------
      &       k50(in), k51(in), k52(in), k53(in), k54(in),
      &       k55(in), k56(in), k57(in), k58(in),
      &       k13dd(in, 14), h2dust(in), 
+#ifdef SMBH_RAD
+     &       h2dust2(in),
+#endif
      &       ncrn(in), ncrd1(in), ncrd2(in),
      &       k24shield(in), k25shield(in), k26shield(in),
      &       k28shield(in), k29shield(in), k30shield(in),
@@ -1139,6 +1228,9 @@ c -------------------------------------------------------------------
       integer*8 indixe(in)
       real*8 t1(in), t2(in), logtem(in), tdef(in),
      &       tdust(in), dust2gas(in)
+#ifdef SMBH_RAD
+     &     , tdust2(in)
+#endif
 
 !     1D temporaries (not passed in)
 
@@ -1304,6 +1396,9 @@ c -------------------------------------------------------------------
 
                if (tdust(i) .gt. dtemend) then
                   h2dust(i) = tiny8
+#ifdef SMBH_RAD
+                  h2dust2(i) = tiny8
+#endif
                else
 
 !                 Get log dust temperature
@@ -1334,10 +1429,32 @@ c -------------------------------------------------------------------
                   h2dust(i) = dusti1(i) + 
      &                 (dusti2(i) - dusti1(i))*d_tdef(i)
 
+#ifdef SMBH_RAD
+                  dusti1(i) = h2dust2a(indixe(i), d_indixe(i)) +
+     &                 (h2dust2a(indixe(i)+1, d_indixe(i)) - 
+     &                 h2dust2a(indixe(i),   d_indixe(i)))*tdef(i)
+                  dusti2(i) = h2dust2a(indixe(i), d_indixe(i)+1) +
+     &                 (h2dust2a(indixe(i)+1, d_indixe(i)+1) - 
+     &                 h2dust2a(indixe(i),   d_indixe(i)+1))*tdef(i)
+                  h2dust2(i) = dusti1(i) + 
+     &                 (dusti2(i) - dusti1(i))*d_tdef(i)
+
+!                 Multiply by conversion factor from dust mass density to 
+!                 (number density x cross-sections)
+
+                  h2dust (i) = h2dust (i) * S_Silicate
+                  h2dust2(i) = h2dust2(i) * S_Graphite
+!!                write(*,*) 'ggg Silicate' 
+!!                write(*,*) tdust(i), h2dust(i), S_Silicate
+!!   &                     , h2dust(i) * S_Silicate * dom * dom
+!!                write(*,*) 'ggg Graphite' 
+!!                write(*,*) tdust2(i), h2dust2(i), S_Graphite
+!!   &                     , h2dust2(i) * S_Graphite * dom * dom
+#else
 !                 Multiply by dust to gas ratio
 
                   h2dust(i) = h2dust(i) * dust2gas(i)
-
+#endif
                endif
             endif
          enddo
@@ -1692,7 +1809,11 @@ c
      &                     k28shield, k29shield, k30shield, k31shield,
      &                     iradtrans, irt_honly, 
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask, edot, chunit, dom)
+     &                     itmask, edot, chunit, dom
+#ifdef SMBH_RAD
+     &                   , Silicate, Graphite, h2dust2
+#endif
+     &            )
 
 ! -------------------------------------------------------------------
 
@@ -1713,6 +1834,9 @@ c
      &        HeI(in,jn,kn), HeII(in,jn,kn), HeIII(in,jn,kn),
      &        d(in,jn,kn),
      &        HM(in,jn,kn),  H2I(in,jn,kn), H2II(in,jn,kn)
+#ifdef SMBH_RAD
+     &      , Silicate(in,jn,kn), Graphite(in,jn,kn)
+#endif
 
 !      Radiative Transfer Fields
       R_PREC  kphHI(in,jn,kn), kphHeI(in,jn,kn), kphHeII(in,jn,kn)
@@ -1727,6 +1851,9 @@ c
      &       k16(in), k17(in), k18(in), k19(in), k22(in),
      &       k50(in), k51(in), k52(in), k53(in), k54(in),
      &       k55(in), k56(in), k57(in), k58(in), h2dust(in), 
+#ifdef SMBH_RAD
+     &       h2dust2(in),
+#endif
      &       ncrn(in), ncrd1(in), ncrd2(in), rhoH(in), 
      &       k24shield(in), k25shield(in), k26shield(in),
      &       k28shield(in), k29shield(in), k30shield(in),
@@ -1798,8 +1925,15 @@ c
 !     Add H2 formation on dust grains
 
             if (anydust) then
+#ifdef SMBH_RAD
+               HIdot(i) = HIdot(i) 
+     &              -(2._DKIND * h2dust (i) * Silicate(i,j,k)
+     &              + 2._DKIND * h2dust2(i) * Graphite(i,j,k))
+     &                  * HI(i,j,k)
+#else
                HIdot(i) = HIdot(i) 
      &              - 2._DKIND * h2dust(i) * rhoH(i)
+#endif
             endif
 
 !     Compute the electron density rate-of-change
@@ -1830,21 +1964,32 @@ c
      &           (HI(i,j,k) * ncrd1(i) +
      &           H2I(i,j,k) * 0.5_DKIND * ncrd2(i)))))**(-1._DKIND)
 
-            H2delta(i) = 
-     &          HI(i,j,k) *
-     &           (  4.48_DKIND * k22(i) * HI(i,j,k)**2._DKIND
-     &            - 4.48_DKIND * k13(i) * H2I(i,j,k)/2._DKIND)
-
             ! We only want to apply this if the formation dominates, but we
             ! need to apply it outside the delta calculation.
+#ifdef CORRECTED_BY_CHIAKI2020FEB
+            H2delta(i) = 
+     &          HI(i,j,k) *
+     &           ( (3.53_DKIND * k8 (i) * HM(i,j,k)
+     &            + 4.48_DKIND * k22(i) * HI(i,j,k)**2._DKIND)
+     &            * h2heatfac(i)
+     &            - 4.48_DKIND * k13(i) * H2I(i,j,k)/2._DKIND)
+#else
             if(H2delta(i).gt.0._DKIND) then
               H2delta(i) = H2delta(i) * h2heatfac(i)
             endif
+#endif
 
             if (anydust) then
+#ifdef SMBH_RAD
+               H2delta(i) = H2delta(i) + 
+     &            ( h2dust (i) * Silicate(i,j,k)
+     &            + h2dust2(i) * Graphite(i,j,k) ) * HI(i,j,k) * 
+     &              (0.2_DKIND + 4.2_DKIND * h2heatfac(i))
+#else
                H2delta(i) = H2delta(i) + 
      &              h2dust(i) * HI(i,j,k) * rhoH(i) * 
      &              (0.2_DKIND + 4.2_DKIND * h2heatfac(i))
+#endif
             endif
 
 !            H2dmag = abs(H2delta)/(
@@ -1911,7 +2056,11 @@ c
      &                     dedot_prev, HIdot_prev,
      &                     iradtrans, irt_honly,
      &                     kphHI, kphHeI, kphHeII,
-     &                     itmask)
+     &                     itmask
+#ifdef SMBH_RAD
+     &                   , Silicate, Graphite, h2dust2
+#endif
+     &            )
 c -------------------------------------------------------------------
 
       implicit NONE
@@ -1931,6 +2080,9 @@ c -------------------------------------------------------------------
      &        d(in,jn,kn),
      &        HM(in,jn,kn),  H2I(in,jn,kn), H2II(in,jn,kn),
      &        DI(in,jn,kn),  DII(in,jn,kn), HDI(in,jn,kn)
+#ifdef SMBH_RAD
+     &      , Silicate(in,jn,kn), Graphite(in,jn,kn)
+#endif
 
 !     Radiation Fields
       R_PREC  kphHI(in,jn,kn), kphHeI(in,jn,kn), kphHeII(in,jn,kn)
@@ -1945,6 +2097,9 @@ c -------------------------------------------------------------------
      &       k50(in), k51(in), k52(in), k53(in), k54(in),
      &       k55(in), k56(in), k57(in), k58(in), 
      &       h2dust(in), rhoH(in),
+#ifdef SMBH_RAD
+     &       h2dust2(in),
+#endif
      &       k24shield(in), k25shield(in), k26shield(in),
      &       k28shield(in), k29shield(in), k30shield(in),
      &       k31shield(in),
@@ -2131,7 +2286,13 @@ c --- (C) Now do extra 3-species for molecular hydrogen ---
             if (iradtrans .eq. 1) acoef = acoef + kphHI(i,j,k)
 
             if (anydust) then
+#ifdef SMBH_RAD
+               acoef = acoef + 2._DKIND *
+     &            ( h2dust (i) * Silicate(i,j,k)
+     &            + h2dust2(i) * Graphite(i,j,k) )
+#else
                acoef = acoef + 2._DKIND * h2dust(i) * rhoH(i)
+#endif
             endif
 
             HIp(i)  = ( scoef*dtit(i) + HI(i,j,k) ) / 
@@ -2208,8 +2369,14 @@ c --- (C) Now do extra 3-species for molecular hydrogen ---
      &              + k29shield(i) + k31shield(i)
 
             if (anydust) then
+#ifdef SMBH_RAD
+               scoef = scoef + 2._DKIND *
+     &            ( h2dust (i) * Silicate(i,j,k)
+     &            + h2dust2(i) * Graphite(i,j,k) ) * HI(i,j,k)
+#else
                scoef = scoef + 2._DKIND * h2dust(i) *
      &              HI(i,j,k) * rhoH(i)
+#endif
             endif
 
             H2Ip(i) = ( scoef*dtit(i) + H2I(i,j,k) )
@@ -2272,6 +2439,9 @@ c
      &            +  2._DKIND*k53(i) * HII(i,j,k)* HDI(i,j,k)/3._DKIND
      &            )
      &            + k24shield(i)*DI(i,j,k)
+#ifdef CORRECTED_BY_CHIAKI2020MAY
+            acoef = 0._DKIND
+#endif
             if (iradtrans .eq. 1) scoef = scoef + kphHI(i,j,k)*DI(i,j,k)
             acoef =    k2(i)  * de(i,j,k)
      &            +    k51(i) * HI(i,j,k)
