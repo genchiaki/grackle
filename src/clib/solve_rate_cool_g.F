@@ -1929,8 +1929,8 @@ c
             if (anydust) then
 #ifdef SMBH_RAD
                HIdot(i) = HIdot(i) 
-     &              -(2._DKIND * h2dust (i) * Silicate(i,j,k)
-     &              + 2._DKIND * h2dust2(i) * Graphite(i,j,k))
+     &              - 2._DKIND *(h2dust (i) * Silicate(i,j,k)
+     &                         + h2dust2(i) * Graphite(i,j,k))
      &                  * HI(i,j,k)
 #else
                HIdot(i) = HIdot(i) 
