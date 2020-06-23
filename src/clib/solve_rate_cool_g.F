@@ -1444,12 +1444,14 @@ c -------------------------------------------------------------------
 
                   h2dust (i) = h2dust (i) * S_Silicate
                   h2dust2(i) = h2dust2(i) * S_Graphite
-!!                write(*,*) 'ggg Silicate' 
-!!                write(*,*) tdust(i), h2dust(i), S_Silicate
-!!   &                     , h2dust(i) * S_Silicate * dom * dom
+!!                write(*,*) 'ggg Silicate' ! kunit = 5.3317666399170809d-016 
+!!                write(*,*) tgas1d(i), tdust(i)
+!!                write(*,*) h2dust(i) / S_Silicate
+!!   &                      * 5.3317666399170809d-016 / 1.673d-24
 !!                write(*,*) 'ggg Graphite' 
-!!                write(*,*) tdust2(i), h2dust2(i), S_Graphite
-!!   &                     , h2dust2(i) * S_Graphite * dom * dom
+!!                write(*,*) tgas1d(i), tdust(i)
+!!                write(*,*) h2dust(i) / S_Graphite
+!!   &                      * 5.3317666399170809d-016 / 1.673d-24
 #else
 !                 Multiply by dust to gas ratio
 

@@ -182,10 +182,10 @@ c
       real*8 vH_avr, S_H, bHP_aPC, epsilon_H2
       real*8 E_HC_Silicate, E_HP_Silicate, E_S_Silicate
      &     , E_HC_Graphite, E_HP_Graphite, E_S_Graphite
-      parameter (E_HC_Silicate = 200.d0, E_HP_Silicate = 650.d0
-     &         , E_S_Silicate = 3.d4
-     &         , E_HC_Graphite = 250.d0, E_HP_Graphite = 800.d0
-     &         , E_S_Graphite = 3.d4) ! Kelvin
+      parameter (E_HP_Silicate = 650.d0, E_HC_Silicate = 3.d4
+     &         , E_S_Silicate = 200.d0
+     &         , E_HP_Graphite = 800.d0, E_HC_Graphite = 3.d4
+     &         , E_S_Graphite = 250.d0) ! Kelvin
 #endif
 
 c
@@ -586,6 +586,16 @@ c     Cazaux & Tielens (2002)
            epsilon_H2 = (1.d0 + bHP_aPC)**(-1.d0)
            h2dusta(i,j) = 0.5d0 * vH_avr * S_H * epsilon_H2
      &                  / kunit * mh
+!!         if((i.eq.334).and.(j.eq.232)) then
+!!            write(*,*) 'XXX', ttt, d_ttt
+!!            write(*,*) E_HC_Silicate, E_HP_Silicate, E_S_Silicate
+!!            write(*,*) 
+!!   &        ( 1.d0 + sqrt( (E_HC_Silicate - E_S_Silicate)
+!!   &                     / (E_HP_Silicate - E_S_Silicate) ) )**2.d0
+!!   &      , exp(-E_S_Silicate / d_ttt)
+!!            write(*,*) vH_avr, bHP_aPC, epsilon_H2, S_H
+!!            write(*,*) h2dusta(i,j)*kunit/mh
+!!         endif
 
            bHP_aPC = 1.d0/4.d0
      &      * ( 1.d0 + sqrt( (E_HC_Graphite - E_S_Graphite)
@@ -594,6 +604,16 @@ c     Cazaux & Tielens (2002)
            epsilon_H2 = (1.d0 + bHP_aPC)**(-1.d0)
            h2dust2a(i,j) = 0.5d0 * vH_avr * S_H * epsilon_H2
      &                  / kunit * mh
+!!         if((i.eq.334).and.(j.eq.232)) then
+!!            write(*,*) 'XXX', ttt, d_ttt
+!!            write(*,*) E_HC_Graphite, E_HP_Graphite, E_S_Graphite
+!!            write(*,*) 
+!!   &        ( 1.d0 + sqrt( (E_HC_Graphite - E_S_Graphite)
+!!   &                     / (E_HP_Graphite - E_S_Graphite) ) )**2.d0
+!!   &      , exp(-E_S_Graphite / d_ttt)
+!!            write(*,*) vH_avr, bHP_aPC, epsilon_H2, S_H
+!!            write(*,*) h2dust2a(i,j)*kunit/mh
+!!         endif
 #else
 #define USE_OMUKAI_2000
 #ifdef  USE_OMUKAI_2000
