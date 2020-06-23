@@ -790,6 +790,17 @@ c  new (correct) way: (april 4, 2007)
      &      , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_Silicate)
 !!       write(*,*) 'dd1', tdust(1)
 
+!      Sublimation
+
+         do i = is+1, ie+1
+            if ( itmask(i) ) then
+            if (tdust(i) .gt. 0.99_DKIND * 1.5e3_DKIND) then
+!!             Metal(i,j,k) = Metal(i,j,k) + Silicate(i,j,k)
+               Silicate(i,j,k) = tiny
+            endif
+            endif
+         enddo
+
 !     Calculate silicate cooling rate
 
          do i = is+1, ie+1
@@ -813,6 +824,17 @@ c  new (correct) way: (april 4, 2007)
      &      , mybhrf, S_Graphite
      &      , kp_gr_Size, kp_gr_N, kp_gr_dTd, kp_gr_Td, kp_Graphite)
 !!       write(*,*) 'ee1', tdust2(1)
+
+!      Sublimation
+
+         do i = is+1, ie+1
+            if ( itmask(i) ) then
+            if (tdust2(i) .gt. 0.99_DKIND * 1.5e3_DKIND) then
+!!             Metal(i,j,k) = Metal(i,j,k) + Graphite(i,j,k)
+               Graphite(i,j,k) = tiny
+            endif
+            endif
+         enddo
 
 !     Calculate graphite cooling rate
 
